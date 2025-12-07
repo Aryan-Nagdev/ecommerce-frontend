@@ -1,14 +1,12 @@
-# Dynamic Pricing Frontend (React)
+# Ecommerce Frontend (React)
 
-React based user interface that interacts with the backend ML API to display instant delivery price predictions using input features like weight, type and distance.
+Full UI for an e-commerce site including authentication, product listing, comparison, cart and checkout flow. Built with reusable components and Context API for logic sharing.
 
 ## Features
-• Real-time price request  
-• Lightweight UI  
-• Form based input  
+• Login / Signup UI  
+• Product pages    
+• Cart & checkout UI  
+• React Context based state  
 
-## Tech Stack
-React, JavaScript
-
-## Author
-Aryan Nagdev
+## Tech Used
+React, JavaScript, Context API
