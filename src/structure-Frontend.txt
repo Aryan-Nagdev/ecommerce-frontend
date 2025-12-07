@@ -1,0 +1,37 @@
+my-shop/
+├── public/
+│   └── index.html
+├── src/
+│   ├── components/
+│   │   ├── Navbar.js
+│   │   ├── Footer.js
+│   │   └── ProductCard.js
+│   ├── pages/
+│   │   ├── Login.js
+│   │   ├── Signup.js
+│   │   ├── Home.js
+│   │   ├── ProductList.js
+│   │   ├── ProductDetail.js
+│   │   ├── Comparison.js
+│   │   ├── Cart.js
+│   │   ├── Checkout.js
+│   │   └── OrderConfirm.js
+│   ├── context/
+│   │   └── CartContext.js
+│   ├── data/
+│   │   └── products.js
+│   ├── App.js
+│   ├── index.js
+│   └── index.css
+└── package.json
+
+
+new backend
+a
+shopkaro-backend/
+├── server.js          ← All routes + main logic
+├── models.js          ← All 4 schemas (User, Product, Cart, Order)
+├── db.js              ← MongoDB connection
+├── seedProducts.js    ← Optional: Add 50+ real products
+├── .env
+└── package.json
