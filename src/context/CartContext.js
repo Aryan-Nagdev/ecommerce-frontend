@@ -5,18 +5,21 @@ const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
-  const API = "https://ecommerce-backend-k7re.onrender.com/api";  // ← FIXED: Added "re"
+  const API = "https://ecommerce-backend-k7re.onrender.com/api";
 
-  // ALWAYS GET FRESH USER — NEVER CACHE
+  // ✅ FIXED: Read both possible keys "userData" OR "user"
   const getUser = () => {
     try {
-      const stored = localStorage.getItem("user");
+      const stored =
+        localStorage.getItem("userData") || localStorage.getItem("user");
+
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
   };
 
+  // ✅ Load cart from backend
   const loadCart = async () => {
     const user = getUser();
     if (!user?.id) {
@@ -35,23 +38,26 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // Auto load cart on mount + when localStorage changes
   useEffect(() => {
     loadCart();
-    window.addEventListener("storage", loadCart);
+    const handleStorage = () => loadCart();
+
+    window.addEventListener("storage", handleStorage);
+
     const interval = setInterval(loadCart, 3000);
+
     return () => {
-      window.removeEventListener("storage", loadCart);
+      window.removeEventListener("storage", handleStorage);
       clearInterval(interval);
     };
   }, []);
 
+  // ✅ FINAL FIX: Ensure product._id is always a string
   const addToCart = async (product, qty = 1) => {
     const user = getUser();
-    if (!user?.id) {
-      // NO ALERT — JUST DO NOTHING (professional)
-      return;
-    }
+    if (!user?.id) return; // Not logged in
+
+    const quantity = typeof qty === "number" ? qty : 1;
 
     try {
       const res = await fetch(`${API}/cart`, {
@@ -61,9 +67,9 @@ export const CartProvider = ({ children }) => {
           userId: user.id,
           product: {
             ...product,
-            _id: product._id.toString()  // fixes ObjectId issue
+            _id: product._id?.toString(),
           },
-          qty
+          qty: quantity,
         }),
       });
 
@@ -71,13 +77,14 @@ export const CartProvider = ({ children }) => {
         const data = await res.json();
         setCart(data.items || []);
       } else {
-        console.error("Add to cart failed with status:", res.status);  // for debugging
+        console.error("Add failed:", res.status);
       }
     } catch (err) {
       console.error("Add to cart error:", err);
     }
   };
 
+  // ✅ update quantity
   const updateQty = async (productId, qty) => {
     const user = getUser();
     if (!user?.id || qty < 1) return;
@@ -85,11 +92,17 @@ export const CartProvider = ({ children }) => {
     await fetch(`${API}/cart`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, productId, qty }),
+      body: JSON.stringify({
+        userId: user.id,
+        productId: productId.toString(),
+        qty,
+      }),
     });
+
     loadCart();
   };
 
+  // ✅ remove product
   const removeFromCart = async (productId) => {
     const user = getUser();
     if (!user?.id) return;
@@ -97,9 +110,20 @@ export const CartProvider = ({ children }) => {
     await fetch(`${API}/cart`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, productId }),
+      body: JSON.stringify({
+        userId: user.id,
+        productId: productId.toString(),
+      }),
     });
+
     loadCart();
+  };
+
+  // OPTIONAL — but used in your Cart page
+  const totalPrice = () => {
+    return cart.reduce((sum, item) => {
+      return sum + Number(item.productId?.price || 0) * (item.qty || 1);
+    }, 0);
   };
 
   return (
@@ -110,6 +134,7 @@ export const CartProvider = ({ children }) => {
         updateQty,
         removeFromCart,
         loadCart,
+        totalPrice,
       }}
     >
       {children}
