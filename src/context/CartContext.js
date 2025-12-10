@@ -6,113 +6,74 @@ const CartContext = createContext();
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
 
-  const getUser = () => {
+  // fetch cart
+  const fetchCart = async () => {
     try {
-      const u = localStorage.getItem("user");
-      return u ? JSON.parse(u) : null;
+      const res = await fetch(
+        "https://ecommerce-backend-k7re.onrender.com/api/cart"
+      );
+      const data = await res.json();
+      setCart(Array.isArray(data) ? data : []);
     } catch {
-      return null;
+      setCart([]);
     }
   };
 
-  const loadCart = async () => {
-    const user = getUser();
-    if (!user?.id) {
-      setCart([]);
-      return;
-    }
-
+  // add to cart  (qty optional)
+  const addToCart = async (product, qty = 1) => {
     try {
-      const res = await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setCart(data.items || []);
-      } else {
-        setCart([]);
-      }
-    } catch {
-      setCart([]);
+      const res = await fetch(
+        "https://ecommerce-backend-k7re.onrender.com/api/cart",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productId: product._id,
+            title: product.title,
+            price: product.price,
+            images: product.images,
+            qty
+          }),
+        }
+      );
+
+      await fetchCart();
+    } catch (err) {
+      console.log(err);
     }
+  };
+
+  // update
+  const updateQty = async (id, qty) => {
+    await fetch(
+      `https://ecommerce-backend-k7re.onrender.com/api/cart/${id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qty }),
+      }
+    );
+    fetchCart();
+  };
+
+  // delete
+  const removeFromCart = async (id) => {
+    await fetch(
+      `https://ecommerce-backend-k7re.onrender.com/api/cart/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
+    fetchCart();
   };
 
   useEffect(() => {
-    loadCart();
-    const handleStorage = () => loadCart();
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+    fetchCart();
   }, []);
-
-  const addToCart = async (product, qty = 1) => {
-    const user = getUser();
-    if (!user?.id) return;
-
-    try {
-      const res = await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-          // NO Authorization header — your backend doesn't need it!
-        },
-        body: JSON.stringify({ userId: user.id, product, qty }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setCart(data.items || []);
-      }
-    } catch (err) {
-      // silent
-    }
-  };
-
-  const updateQty = async (productId, qty) => {
-    const user = getUser();
-    if (!user?.id || qty < 1) return;
-
-    await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, productId, qty }),
-    });
-    loadCart();
-  };
-
-  const removeFromCart = async (productId) => {
-    const user = getUser();
-    if (!user?.id) return;
-
-    await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, productId }),
-    });
-    loadCart();
-  };
-
-  const clearCart = async () => {
-    setCart([]);
-    const user = getUser();
-    if (!user?.id) return;
-    await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`, {
-      method: "DELETE",
-    });
-  };
-
-  const totalPrice = () => cart.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 1), 0);
-  const totalItems = cart.reduce((sum, item) => sum + (item.qty || 1), 0);
 
   return (
     <CartContext.Provider
-      value={{
-        cart,
-        addToCart,
-        updateQty,
-        removeFromCart,
-        clearCart,
-        totalPrice,
-        totalItems,
-        loadCart,
-      }}
+      value={{ cart, addToCart, updateQty, removeFromCart, fetchCart }}
     >
       {children}
     </CartContext.Provider>
