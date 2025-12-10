@@ -1,14 +1,15 @@
 import React, { useEffect } from "react";
-import { useCart } from "../context/CartContext";
-import Navbar from "../components/Navbar";
 import { useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
+import { useCart } from "../context/CartContext";
 
 const Cart = () => {
-  const { cart, updateQty, removeFromCart, fetchCart, totalPrice } = useCart();
+  const { cart, updateQty, removeFromCart, loadCart, totalPrice } = useCart();
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchCart();
+    loadCart();
   }, []);
 
   if (cart.length === 0) {
@@ -16,6 +17,7 @@ const Cart = () => {
       <>
         <Navbar />
         <div className="text-center py-32 text-3xl">Your cart is empty</div>
+        <Footer />
       </>
     );
   }
@@ -23,64 +25,64 @@ const Cart = () => {
   return (
     <>
       <Navbar />
-      <div className="max-w-5xl mx-auto p-5 grid grid-cols-3 gap-6">
-        <div className="col-span-2 space-y-4">
-          {cart.map((item) => (
-            <div
-              key={item._id}
-              className="border p-4 rounded-lg flex justify-between"
-            >
-              <div>
-                <h3 className="font-bold">{item.product?.title}</h3>
-                <p className="text-sm text-gray-600">
-                  ₹ {item.product?.price}
-                </p>
 
-                <div className="flex items-center gap-3 mt-2">
-                  <button
-                    onClick={() =>
-                      updateQty(item._id, item.quantity - 1)
-                    }
-                    className="px-2 bg-gray-200"
-                  >
-                    -
-                  </button>
+      <div className="container mx-auto py-10">
+        <h1 className="text-3xl font-semibold mb-6">My Cart</h1>
 
-                  <span>{item.quantity}</span>
+        {cart.map((item) => (
+          <div
+            key={item.productId}
+            className="border p-4 rounded-lg mb-4 flex gap-6 items-center"
+          >
+            <img src={item.image} alt={item.title} className="w-24 h-24" />
 
-                  <button
-                    onClick={() =>
-                      updateQty(item._id, item.quantity + 1)
-                    }
-                    className="px-2 bg-gray-200"
-                  >
-                    +
-                  </button>
-                </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold">{item.title}</h3>
+              <p className="text-gray-600">₹{item.price}</p>
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => updateQty(item.productId, item.qty - 1)}
+                  className="px-3 py-1 border rounded"
+                >
+                  -
+                </button>
+
+                <span className="px-4 py-1 border rounded bg-gray-100">
+                  {item.qty}
+                </span>
+
+                <button
+                  onClick={() => updateQty(item.productId, item.qty + 1)}
+                  className="px-3 py-1 border rounded"
+                >
+                  +
+                </button>
               </div>
 
               <button
-                onClick={() => removeFromCart(item._id)}
-                className="text-red-500"
+                onClick={() => removeFromCart(item.productId)}
+                className="text-red-500 mt-3"
               >
                 Remove
               </button>
             </div>
-          ))}
+          </div>
+        ))}
+
+        <div className="text-right text-xl font-bold mt-6">
+          Total : ₹{totalPrice()}
         </div>
 
-        <div className="border p-4 rounded-lg h-fit">
-          <h2 className="text-xl font-bold mb-4">Order Summary</h2>
-          <p className="text-lg"> Total: ₹ {totalPrice}</p>
-
-          <button
-            onClick={() => navigate("/checkout")}
-            className="bg-orange-600 text-white px-6 py-2 rounded w-full mt-6"
-          >
-            Continue to Checkout
-          </button>
-        </div>
+        <button
+          onClick={() => navigate("/checkout")}
+          className="px-5 py-3 bg-orange-500 text-white mt-6"
+        >
+          Checkout
+        </button>
       </div>
+
+      <Footer />
     </>
   );
 };
