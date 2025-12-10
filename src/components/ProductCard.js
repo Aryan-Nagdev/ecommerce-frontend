@@ -6,29 +6,22 @@ import { useCart } from '../context/CartContext';
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
 
-  // SAFETY FIX: Always send clean product object
   const handleAddToCart = (e) => {
-    e.preventDefault(); // Prevent navigation when clicking button
+    e.preventDefault();
     e.stopPropagation();
 
-    if (!product?._id) {
-      console.error("Product has no _id!", product);
-      return;
-    }
-
-    addToCart({
-      _id: product._id,
-      title: product.title,
-      price: product.price,
-      images: product.images || [],
-      mrp: product.mrp,
-      discountPercent: product.discountPercent || 0
-    });
+    // THIS IS THE ONLY FIX NEEDED — send _id as string!
+    addToCart(
+      {
+        ...product,
+        _id: product._id.toString(), // ← FORCE STRING
+      },
+      1
+    );
   };
 
   return (
     <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition duration-300 overflow-hidden group">
-
       <Link to={`/product/${product._id}`}>
         <div className="relative overflow-hidden">
           <img
