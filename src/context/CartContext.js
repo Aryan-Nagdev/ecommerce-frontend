@@ -1,79 +1,105 @@
-// src/context/CartContext.js
-import React, { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-  const [cart, setCart] = useState([]);
+  const API = "https://ecommerce-backend-k7.onrender.com/api";
 
-  // fetch cart
+  const [cart, setCart] = useState([]);
+  const user = JSON.parse(localStorage.getItem("user"));
+
+  // ---------------------------
+  // FETCH CART
+  // ---------------------------
   const fetchCart = async () => {
     try {
-      const res = await fetch(
-        "https://ecommerce-backend-k7re.onrender.com/api/cart"
-      );
+      if (!user?.id) return;
+
+      const res = await fetch(`${API}/cart/${user.id}`);
       const data = await res.json();
-      setCart(Array.isArray(data) ? data : []);
-    } catch {
-      setCart([]);
-    }
-  };
 
-  // add to cart  (qty optional)
-  const addToCart = async (product, qty = 1) => {
-    try {
-      const res = await fetch(
-        "https://ecommerce-backend-k7re.onrender.com/api/cart",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            productId: product._id,
-            title: product.title,
-            price: product.price,
-            images: product.images,
-            qty
-          }),
-        }
-      );
-
-      await fetchCart();
+      setCart(data.items || []);
     } catch (err) {
-      console.log(err);
+      console.error("Fetch Cart Error:", err);
     }
   };
 
-  // update
-  const updateQty = async (id, qty) => {
-    await fetch(
-      `https://ecommerce-backend-k7re.onrender.com/api/cart/${id}`,
-      {
+  // ---------------------------
+  // ADD TO CART
+  // ---------------------------
+  const addToCart = async (product) => {
+    try {
+      if (!user?.id) {
+        alert("Please login first");
+        return;
+      }
+
+      const res = await fetch(`${API}/cart`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          product,
+          qty: 1
+        }),
+      });
+
+      const data = await res.json();
+      setCart(data.items || []);
+    } catch (err) {
+      console.error("Add to Cart Error:", err);
+    }
+  };
+
+  // ---------------------------
+  // UPDATE QUANTITY
+  // ---------------------------
+  const updateQty = async (productId, qty) => {
+    try {
+      if (!user?.id) return;
+
+      await fetch(`${API}/cart`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qty }),
-      }
-    );
-    fetchCart();
+        body: JSON.stringify({ userId: user.id, productId, qty }),
+      });
+
+      fetchCart();
+    } catch (err) {
+      console.error("Update Qty Error:", err);
+    }
   };
 
-  // delete
-  const removeFromCart = async (id) => {
-    await fetch(
-      `https://ecommerce-backend-k7re.onrender.com/api/cart/${id}`,
-      {
+  // ---------------------------
+  // REMOVE ITEM
+  // ---------------------------
+  const removeFromCart = async (productId) => {
+    try {
+      await fetch(`${API}/cart`, {
         method: "DELETE",
-      }
-    );
-    fetchCart();
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, productId }),
+      });
+
+      fetchCart();
+    } catch (err) {
+      console.error("Remove Error:", err);
+    }
   };
 
   useEffect(() => {
     fetchCart();
-  }, []);
+  }, [user?.id]);
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, updateQty, removeFromCart, fetchCart }}
+      value={{
+        cart,
+        addToCart,
+        fetchCart,
+        updateQty,
+        removeFromCart,
+      }}
     >
       {children}
     </CartContext.Provider>
