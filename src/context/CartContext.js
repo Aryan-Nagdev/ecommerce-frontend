@@ -1,4 +1,3 @@
-// src/context/CartContext.js
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 const CartContext = createContext();
@@ -7,19 +6,25 @@ export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const API = "https://ecommerce-backend-k7re.onrender.com/api";
 
-  // ✅ FIXED: Read both possible keys "userData" OR "user"
+  // ✅ FIX 1: Read correct login key ("shopkaro_user")
   const getUser = () => {
     try {
-      const stored =
-        localStorage.getItem("userData") || localStorage.getItem("user");
+      const stored = localStorage.getItem("shopkaro_user");
+      if (!stored) return null;
 
-      return stored ? JSON.parse(stored) : null;
+      const user = JSON.parse(stored);
+
+      // ✅ FIX 2: Backend returns "_id", but CartContext needs "id"
+      return {
+        ...user,
+        id: user.id || user._id, // ensure id always exists
+      };
+
     } catch {
       return null;
     }
   };
 
-  // ✅ Load cart from backend
   const loadCart = async () => {
     const user = getUser();
     if (!user?.id) {
@@ -40,24 +45,15 @@ export const CartProvider = ({ children }) => {
 
   useEffect(() => {
     loadCart();
-    const handleStorage = () => loadCart();
-
-    window.addEventListener("storage", handleStorage);
 
     const interval = setInterval(loadCart, 3000);
-
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, []);
 
-  // ✅ FINAL FIX: Ensure product._id is always a string
+  // ADD ITEM
   const addToCart = async (product, qty = 1) => {
     const user = getUser();
-    if (!user?.id) return; // Not logged in
-
-    const quantity = typeof qty === "number" ? qty : 1;
+    if (!user?.id) return;
 
     try {
       const res = await fetch(`${API}/cart`, {
@@ -69,7 +65,7 @@ export const CartProvider = ({ children }) => {
             ...product,
             _id: product._id?.toString(),
           },
-          qty: quantity,
+          qty,
         }),
       });
 
@@ -80,21 +76,21 @@ export const CartProvider = ({ children }) => {
         console.error("Add failed:", res.status);
       }
     } catch (err) {
-      console.error("Add to cart error:", err);
+      console.error("Add error:", err);
     }
   };
 
-  // ✅ update quantity
+  // UPDATE QTY
   const updateQty = async (productId, qty) => {
     const user = getUser();
-    if (!user?.id || qty < 1) return;
+    if (!user?.id) return;
 
     await fetch(`${API}/cart`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: user.id,
-        productId: productId.toString(),
+        productId,
         qty,
       }),
     });
@@ -102,7 +98,7 @@ export const CartProvider = ({ children }) => {
     loadCart();
   };
 
-  // ✅ remove product
+  // REMOVE ITEM
   const removeFromCart = async (productId) => {
     const user = getUser();
     if (!user?.id) return;
@@ -112,14 +108,14 @@ export const CartProvider = ({ children }) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId: user.id,
-        productId: productId.toString(),
+        productId,
       }),
     });
 
     loadCart();
   };
 
-  // OPTIONAL — but used in your Cart page
+  // CALCULATE TOTAL
   const totalPrice = () => {
     return cart.reduce((sum, item) => {
       return sum + Number(item.productId?.price || 0) * (item.qty || 1);
@@ -128,18 +124,11 @@ export const CartProvider = ({ children }) => {
 
   return (
     <CartContext.Provider
-      value={{
-        cart,
-        addToCart,
-        updateQty,
-        removeFromCart,
-        loadCart,
-        totalPrice,
-      }}
+      value={{ cart, addToCart, updateQty, removeFromCart, loadCart, totalPrice }}
     >
       {children}
     </CartContext.Provider>
   );
 };
 
-export const useCart = () => useContext(CartContext);
+export const useCart = () => useContext(CCartContext);
