@@ -11,7 +11,7 @@ const Cart = () => {
     fetchCart();
   }, []);
 
-  if (cart.length === 0) {
+  if (!cart || cart.length === 0) {
     return (
       <>
         <Navbar />
@@ -33,49 +33,49 @@ const Cart = () => {
 
           {/* LEFT SIDE */}
           <div className="lg:col-span-2 space-y-10">
-            {cart.map((item) => {
-              const p = item.productId;
+            {cart?.map((item) => {
+              const p = item?.productId;
 
               return (
                 <div
-                  key={p._id}
+                  key={p?._id}
                   className="bg-white rounded-3xl shadow-xl p-8 flex gap-8"
                 >
                   <img
-                    src={p.images[0]}
+                    src={p?.images?.[0]}
                     className="w-40 h-40 object-cover rounded-xl"
-                    alt={p.title}
+                    alt={p?.title}
                   />
 
                   <div className="flex-1">
-                    <h2 className="text-2xl font-bold">{p.title}</h2>
+                    <h2 className="text-2xl font-bold">{p?.title}</h2>
 
                     <p className="text-3xl text-orange-600 font-bold mt-2">
-                      ₹{p.price}
+                      ₹{p?.price}
                     </p>
 
                     <div className="flex items-center gap-4 mt-6">
                       <button
                         className="px-4 py-2 bg-gray-300 rounded-full"
                         onClick={() =>
-                          item.qty > 1 && updateQty(p._id, item.qty - 1)
+                          item?.qty > 1 && updateQty(p?._id, item?.qty - 1)
                         }
                       >
                         -
                       </button>
 
-                      <span className="text-2xl font-bold">{item.qty}</span>
+                      <span className="text-2xl font-bold">{item?.qty}</span>
 
                       <button
                         className="px-4 py-2 bg-gray-300 rounded-full"
-                        onClick={() => updateQty(p._id, item.qty + 1)}
+                        onClick={() => updateQty(p?._id, (item?.qty || 0) + 1)}
                       >
                         +
                       </button>
 
                       <button
                         className="text-red-600 ml-auto"
-                        onClick={() => removeFromCart(p._id)}
+                        onClick={() => removeFromCart(p?._id)}
                       >
                         Remove
                       </button>
@@ -90,12 +90,12 @@ const Cart = () => {
           <div className="bg-white p-10 rounded-3xl shadow-xl">
             <h2 className="text-3xl font-bold mb-6">Order Summary</h2>
 
-            {cart.map((item) => (
-              <div key={item.productId._id} className="flex justify-between my-2">
+            {cart?.map((item) => (
+              <div key={item?.productId?._id} className="flex justify-between my-2">
                 <span>
-                  {item.productId.title} × {item.qty}
+                  {item?.productId?.title} × {item?.qty}
                 </span>
-                <span>₹{item.productId.price * item.qty}</span>
+                <span>₹{(item?.productId?.price || 0) * (item?.qty || 1)}</span>
               </div>
             ))}
 

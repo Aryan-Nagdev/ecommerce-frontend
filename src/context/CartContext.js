@@ -1,92 +1,97 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 const CartContext = createContext();
-
-export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
 
-  const user = JSON.parse(localStorage.getItem("shopkaro_user") || "{}");
+  const user = JSON.parse(localStorage.getItem("user"));
 
-  // fetch cart
-  const getCart = async () => {
-    if (!user?.id) return;
+  // GET CART
+  async function loadCart() {
+    if (!user) return;
 
-    const res = await fetch(
-      `https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`
-    );
-    const data = await res.json();
-    setCart(data.items || []);
-  };
+    try {
+      const res = await fetch(
+        `https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`
+      );
+      const data = await res.json();
+      setCart(data.items || []);
+    } catch (err) {
+      console.log(err);
+    }
+  }
 
   useEffect(() => {
-    getCart();
+    loadCart();
   }, [user]);
 
-  // add to cart
-  const addToCart = async (product, qty = 1) => {
-    await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, product, qty }),
-    });
 
-    getCart();
-  };
+  // ADD TO CART
+  async function addToCart(product, qty = 1) {
+    if (!user) return alert("Please login");
 
-  // update qty
-  const updateQty = async (productId, qty) => {
-    await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, productId, qty }),
-    });
+    try {
+      const res = await fetch(
+        "https://ecommerce-backend-k7re.onrender.com/api/cart",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id, product, qty }),
+        }
+      );
 
-    getCart();
-  };
+      const data = await res.json();
+      setCart(data.items || []);
+    } catch {}
+  }
 
-  // remove
-  const removeFromCart = async (productId) => {
-    await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, productId }),
-    });
 
-    getCart();
-  };
+  // UPDATE QTY
+  async function updateQty(productId, qty) {
+    try {
+      await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, productId, qty }),
+      });
 
-  // clear
-  const clearCart = async () => {
-    await fetch(
-      `https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`,
-      {
+      loadCart();
+    } catch {}
+  }
+
+
+  // REMOVE
+  async function removeFromCart(productId) {
+    try {
+      await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
         method: "DELETE",
-      }
-    );
-    getCart();
-  };
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, productId }),
+      });
 
-  // ⭐⭐ only this line was changed ⭐⭐
-  const totalPrice = cart.reduce(
-    (sum, item) =>
-      sum + ((item?.productId?.price || 0) * (item?.qty || 1)),
-    0
-  );
+      loadCart();
+    } catch {}
+  }
+
+
+  // SAFE total
+  const totalItems = cart?.reduce((sum, item) => sum + (item.qty || 1), 0);
+
 
   return (
     <CartContext.Provider
       value={{
         cart,
         addToCart,
-        updateQty,
         removeFromCart,
-        clearCart,
-        totalPrice,
+        updateQty,
+        totalItems,
       }}
     >
       {children}
     </CartContext.Provider>
   );
 };
+
+export const useCart = () => useContext(CartContext);
