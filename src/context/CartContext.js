@@ -1,67 +1,77 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { useAuth } from "./AuthContext";
-import toast from "react-hot-toast";
+import { createContext, useContext, useEffect, useState } from "react";
 
 const CartContext = createContext();
+
 export const useCart = () => useContext(CartContext);
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
-  const { user } = useAuth();
 
-  const fetchCart = async () => {
-    if (!user) return setCart([]);
+  const user = JSON.parse(localStorage.getItem("shopkaro_user") || "{}");
 
-    const res = await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`);
+  // fetch cart
+  const getCart = async () => {
+    if (!user?.id) return;
+
+    const res = await fetch(
+      `https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`
+    );
     const data = await res.json();
     setCart(data.items || []);
   };
 
   useEffect(() => {
-    fetchCart();
+    getCart();
   }, [user]);
 
-  // ADD TO CART — FIXED BULK QTY
+  // add to cart
   const addToCart = async (product, qty = 1) => {
-    if (!user) return toast.error("Please login first");
-
-    const res = await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
+    await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        product: { _id: product._id },
-        qty,
-      }),
+      body: JSON.stringify({ userId: user.id, product, qty }),
     });
 
-    const data = await res.json();
-    setCart(data.items || []);
-    toast.success("Added to cart");
+    getCart();
   };
 
+  // update qty
   const updateQty = async (productId, qty) => {
-    await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
+    await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id, productId, qty }),
     });
 
-    fetchCart();
+    getCart();
   };
 
+  // remove
   const removeFromCart = async (productId) => {
-    await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
+    await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id, productId }),
     });
 
-    fetchCart();
+    getCart();
   };
 
+  // clear
+  const clearCart = async () => {
+    await fetch(
+      `https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`,
+      {
+        method: "DELETE",
+      }
+    );
+    getCart();
+  };
+
+  // ⭐⭐ only this line was changed ⭐⭐
   const totalPrice = cart.reduce(
-    (sum, item) => sum + item.productId.price * item.qty,
+    (sum, item) =>
+      sum + ((item?.productId?.price || 0) * (item?.qty || 1)),
     0
   );
 
@@ -72,8 +82,8 @@ export const CartProvider = ({ children }) => {
         addToCart,
         updateQty,
         removeFromCart,
+        clearCart,
         totalPrice,
-        fetchCart,
       }}
     >
       {children}

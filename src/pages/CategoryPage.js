@@ -17,7 +17,8 @@ const CategoryPage = () => {
     .replace('books', 'Books');
 
   useEffect(() => {
-    fetch("https://ecommerce-backend-k7re.onrender.com/api/products?category=${cleanName}`)
+    fetch(`https://ecommerce-backend-k7re.onrender.com/api/products?category=${cleanName}`)
+
       .then(r => r.json())
       .then(setFilteredProducts);
   }, [categoryName]);
