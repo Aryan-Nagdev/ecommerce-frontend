@@ -1,88 +1,158 @@
-import React, { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
-import { useCart } from "../context/CartContext";
+// src/pages/Cart.js
+import React, { useEffect } from 'react';
+import Navbar from '../components/Navbar';
+import { useCart } from '../context/CartContext';
+import { useNavigate } from 'react-router-dom';
 
 const Cart = () => {
-  const { cart, updateQty, removeFromCart, loadCart, totalPrice } = useCart();
+  const { cart, updateQty, removeFromCart, fetchCart, totalPrice } = useCart();
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadCart();
+    fetchCart();
   }, []);
+
+  if (!cart) {
+    return (
+      <>
+        <Navbar />
+        <div className="text-center py-32 text-3xl">Loading cart...</div>
+      </>
+    );
+  }
 
   if (cart.length === 0) {
     return (
       <>
         <Navbar />
-        <div className="text-center py-32 text-3xl">Your cart is empty</div>
-        <Footer />
+        <div className="text-center py-32">
+          <h2 className="text-4xl font-bold mb-8 text-gray-700">Your cart is empty</h2>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-orange-600 text-white px-12 py-5 rounded-full text-xl font-bold hover:bg-orange-700 transition"
+          >
+            Continue Shopping
+          </button>
+        </div>
       </>
     );
   }
 
+  const subtotal = totalPrice();   // <--- FIX
+  const discount = subtotal * 0.1;
+  const total = Math.round(subtotal - discount);
+
   return (
     <>
       <Navbar />
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <h1 className="text-5xl font-bold text-center mb-16 text-orange-600">
+          Shopping Cart ({cart.length} items)
+        </h1>
 
-      <div className="container mx-auto py-10">
-        <h1 className="text-3xl font-semibold mb-6">My Cart</h1>
+        <div className="grid lg:grid-cols-3 gap-12">
 
-        {cart.map((item) => (
-          <div
-            key={item.productId}
-            className="border p-4 rounded-lg mb-4 flex gap-6 items-center"
-          >
-            <img src={item.image} alt={item.title} className="w-24 h-24" />
+          <div className="lg:col-span-2 space-y-10">
+            {cart.map((item) => {
+              const imageUrl = Array.isArray(item.images)
+                ? item.images[0]
+                : (typeof item.images === 'string' ? item.images : null);
 
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold">{item.title}</h3>
-              <p className="text-gray-600">₹{item.price}</p>
-
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => updateQty(item.productId, item.qty - 1)}
-                  className="px-3 py-1 border rounded"
+              return (
+                <div
+                  key={item._id}
+                  className="bg-white rounded-3xl shadow-2xl p-8 flex flex-col sm:flex-row gap-8 hover:shadow-3xl transition-all"
                 >
-                  -
-                </button>
+                  <img
+                    src={imageUrl || "https://via.placeholder.com/200?text=No+Image"}
+                    alt={item.title || "Product"}
+                    className="w-44 h-44 rounded-2xl object-cover border-4 border-gray-100"
+                    onError={(e) => {
+                      e.target.src = "https://via.placeholder.com/200?text=No+Image";
+                    }}
+                  />
 
-                <span className="px-4 py-1 border rounded bg-gray-100">
-                  {item.qty}
-                </span>
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-800">
+                        {item.title || "Unknown Product"}
+                      </h3>
+                      <p className="text-4xl font-bold text-orange-600 mt-4">
+                        ₹{(Number(item.price) || 0).toLocaleString('en-IN')}
+                      </p>
+                    </div>
 
-                <button
-                  onClick={() => updateQty(item.productId, item.qty + 1)}
-                  className="px-3 py-1 border rounded"
-                >
-                  +
-                </button>
+                    <div className="flex items-center gap-6 mt-6">
+                      <button
+                        onClick={() => item.qty > 1 && updateQty(item._id, item.qty - 1)}
+                        className="w-14 h-14 rounded-full bg-gray-200 text-3xl font-bold hover:bg-gray-300 transition"
+                      >
+                        −
+                      </button>
+
+                      <span className="text-3xl font-bold w-20 text-center">
+                        {item.qty || 1}
+                      </span>
+
+                      <button
+                        onClick={() => updateQty(item._id, (item.qty || 1) + 1)}
+                        className="w-14 h-14 rounded-full bg-gray-200 text-3xl font-bold hover:bg-gray-300 transition"
+                      >
+                        +
+                      </button>
+
+                      <button
+                        onClick={() => removeFromCart(item._id)}
+                        className="ml-auto text-red-600 font-bold text-lg hover:text-red-800 transition"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="bg-gradient-to-br from-orange-50 to-pink-50 rounded-3xl shadow-2xl p-10 sticky top-8 h-fit">
+            <h2 className="text-4xl font-bold text-center mb-10 text-gray-800">Order Summary</h2>
+
+            <div className="space-y-6 text-xl">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span className="font-bold">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
 
-              <button
-                onClick={() => removeFromCart(item.productId)}
-                className="text-red-500 mt-3"
-              >
-                Remove
-              </button>
+              <div className="flex justify-between text-green-600 font-semibold">
+                <span>Special Discount (10%)</span>
+                <span>-₹{discount.toFixed(0)}</span>
+              </div>
+
+              <div className="flex justify-between text-green-600">
+                <span>Shipping</span>
+                <span className="font-medium">FREE</span>
+              </div>
+
+              <div className="border-t-4 border-dashed border-orange-300 pt-8 mt-8">
+                <div className="flex justify-between text-3xl font-bold">
+                  <span>Total</span>
+                  <span className="text-orange-600">₹{total.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
             </div>
+
+            <button
+              onClick={() => navigate('/checkout')}
+              className="w-full bg-orange-600 text-white py-6 mt-10 rounded-3xl text-2xl font-bold hover:bg-orange-700 transform hover:scale-105 transition shadow-lg"
+            >
+              Proceed to Checkout
+            </button>
+
           </div>
-        ))}
 
-        <div className="text-right text-xl font-bold mt-6">
-          Total : ₹{totalPrice()}
         </div>
-
-        <button
-          onClick={() => navigate("/checkout")}
-          className="px-5 py-3 bg-orange-500 text-white mt-6"
-        >
-          Checkout
-        </button>
       </div>
-
-      <Footer />
     </>
   );
 };
