@@ -5,7 +5,7 @@ const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
-  const API = "https://ecommerce-backend-k7re.onrender.com/api";
+  const API = "https://ecommerce-backend-k7re.onrender.com/api";  // ← FIXED: Added "re"
 
   // ALWAYS GET FRESH USER — NEVER CACHE
   const getUser = () => {
@@ -70,6 +70,8 @@ export const CartProvider = ({ children }) => {
       if (res.ok) {
         const data = await res.json();
         setCart(data.items || []);
+      } else {
+        console.error("Add to cart failed with status:", res.status);  // for debugging
       }
     } catch (err) {
       console.error("Add to cart error:", err);
