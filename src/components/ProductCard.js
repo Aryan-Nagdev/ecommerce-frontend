@@ -1,3 +1,4 @@
+// src/components/ProductCard.js
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -5,22 +6,39 @@ import { useCart } from '../context/CartContext';
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
 
+  // SAFETY FIX: Always send clean product object
+  const handleAddToCart = (e) => {
+    e.preventDefault(); // Prevent navigation when clicking button
+    e.stopPropagation();
+
+    if (!product?._id) {
+      console.error("Product has no _id!", product);
+      return;
+    }
+
+    addToCart({
+      _id: product._id,
+      title: product.title,
+      price: product.price,
+      images: product.images || [],
+      mrp: product.mrp,
+      discountPercent: product.discountPercent || 0
+    });
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition duration-300 overflow-hidden group">
 
-      {/* PRODUCT PAGE LINK */}
       <Link to={`/product/${product._id}`}>
         <div className="relative overflow-hidden">
-
-          {/* FIXED IMAGE → always loads images[0] */}
           <img
-            src={product.images?.[0]}
+            src={product.images?.[0] || "https://via.placeholder.com/300?text=No+Image"}
             alt={product.title}
             className="w-full h-64 object-cover group-hover:scale-110 transition duration-500"
+            onError={(e) => e.target.src = "https://via.placeholder.com/300?text=No+Image"}
           />
 
-          {/* Discount badge */}
-          {product.discountPercent && (
+          {product.discountPercent > 0 && (
             <span className="absolute top-3 left-3 bg-red-600 text-white px-3 py-1 rounded-full text-sm font-bold">
               {product.discountPercent}% OFF
             </span>
@@ -29,34 +47,31 @@ const ProductCard = ({ product }) => {
       </Link>
 
       <div className="p-5">
-        {/* PRODUCT TITLE */}
         <Link to={`/product/${product._id}`}>
-          <h3 className="font-bold text-lg text-gray-800 hover:text-primary transition">
+          <h3 className="font-bold text-lg text-gray-800 hover:text-orange-600 transition line-clamp-2">
             {product.title}
           </h3>
         </Link>
 
-        {/* Rating (Static for now) */}
         <div className="flex items-center gap-2 mt-2">
           <div className="flex text-yellow-500 text-sm">★★★★☆</div>
           <span className="text-gray-600 text-sm">(892)</span>
         </div>
 
-        {/* PRICE SECTION */}
-        <div className="mt-3">
-          <span className="text-2xl font-bold text-primary">
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-2xl font-bold text-orange-600">
             ₹{product.price.toLocaleString('en-IN')}
           </span>
-
-          <span className="text-gray-500 line-through ml-3 text-lg">
-            ₹{product.mrp.toLocaleString('en-IN')}
-          </span>
+          {product.mrp > product.price && (
+            <span className="text-gray-500 line-through text-lg">
+              ₹{product.mrp.toLocaleString('en-IN')}
+            </span>
+          )}
         </div>
 
-        {/* ADD TO CART */}
         <button
-          onClick={() => addToCart(product)}
-          className="mt-4 w-full bg-primary text-white py-3 rounded-xl font-semibold hover:bg-pink-700 transition transform hover:scale-105"
+          onClick={handleAddToCart}
+          className="mt-4 w-full bg-orange-600 text-white py-3 rounded-xl font-semibold hover:bg-orange-700 transition transform hover:scale-105 shadow-md"
         >
           Add to Cart
         </button>
