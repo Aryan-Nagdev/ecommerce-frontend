@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    const res = await fetch('https://ecommerce-backend-k7re.onrender.com/login', {
+    const res = await fetch('https://ecommerce-backend-k7re.onrender.com/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     });
     const data = await res.json();
     if (res.ok) {
-      await login(email, password); // Auto login after signup
+      await login(email, password);
     } else {
       throw new Error(data.message || "Signup failed");
     }
