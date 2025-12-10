@@ -1,24 +1,23 @@
 // src/context/CartContext.js
-import { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
+  const [cart, setCart] = useState([]);
   const API = "https://ecommerce-backend-k7re.onrender.com/api";
 
-  const [cart, setCart] = useState([]);
-
-  // ALWAYS READ FRESH USER — NEVER CACHE IT!
+  // ALWAYS GET FRESH USER — NEVER CACHE
   const getUser = () => {
     try {
-      const u = localStorage.getItem("user");
-      return u ? JSON.parse(u) : null;
+      const stored = localStorage.getItem("user");
+      return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
     }
   };
 
-  const fetchCart = async () => {
+  const loadCart = async () => {
     const user = getUser();
     if (!user?.id) {
       setCart([]);
@@ -32,14 +31,25 @@ export const CartProvider = ({ children }) => {
         setCart(data.items || []);
       }
     } catch (err) {
-      console.error("Fetch cart error:", err);
+      console.error("Load cart failed:", err);
     }
   };
+
+  // Auto load cart on mount + when localStorage changes
+  useEffect(() => {
+    loadCart();
+    window.addEventListener("storage", loadCart);
+    const interval = setInterval(loadCart, 3000);
+    return () => {
+      window.removeEventListener("storage", loadCart);
+      clearInterval(interval);
+    };
+  }, []);
 
   const addToCart = async (product, qty = 1) => {
     const user = getUser();
     if (!user?.id) {
-      // NO ALERT — SILENT FAIL (professional)
+      // NO ALERT — JUST DO NOTHING (professional)
       return;
     }
 
@@ -51,7 +61,7 @@ export const CartProvider = ({ children }) => {
           userId: user.id,
           product: {
             ...product,
-            _id: product._id.toString()  // fixes backend ObjectId issue
+            _id: product._id.toString()  // fixes ObjectId issue
           },
           qty
         }),
@@ -62,7 +72,7 @@ export const CartProvider = ({ children }) => {
         setCart(data.items || []);
       }
     } catch (err) {
-      console.error("Add to cart failed:", err);
+      console.error("Add to cart error:", err);
     }
   };
 
@@ -75,7 +85,7 @@ export const CartProvider = ({ children }) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id, productId, qty }),
     });
-    fetchCart();
+    loadCart();
   };
 
   const removeFromCart = async (productId) => {
@@ -87,19 +97,8 @@ export const CartProvider = ({ children }) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: user.id, productId }),
     });
-    fetchCart();
+    loadCart();
   };
-
-  // Auto-refresh cart when user changes
-  useEffect(() => {
-    fetchCart();
-  }, []);
-
-  // Refresh cart every 5 seconds (safety)
-  useEffect(() => {
-    const interval = setInterval(fetchCart, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <CartContext.Provider
@@ -108,7 +107,7 @@ export const CartProvider = ({ children }) => {
         addToCart,
         updateQty,
         removeFromCart,
-        fetchCart,
+        loadCart,
       }}
     >
       {children}
