@@ -1,4 +1,5 @@
 // src/context/CartContext.js
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 const CartContext = createContext();
@@ -6,31 +7,47 @@ const CartContext = createContext();
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
 
-  const user = JSON.parse(localStorage.getItem("user"));
+  // Always get fresh user from localStorage (fixes stale user bug)
+  const getUser = () => {
+    try {
+      const stored = localStorage.getItem("user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  };
 
   async function loadCart() {
-    if (!user) {
+    const user = getUser();
+    if (!user?.id) {
       setCart([]);
       return;
     }
 
     try {
       const res = await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`);
-      if (!res.ok) throw new Error("Failed to fetch cart");
+      if (!res.ok) return setCart([]);
       const data = await res.json();
       setCart(data.items || []);
     } catch (err) {
-      console.log("Load cart error:", err);
       setCart([]);
     }
   }
 
+  // Runs when user logs in/out or page loads
   useEffect(() => {
     loadCart();
-  }, [user]);
 
+    // Optional: reload cart when localStorage changes (e.g. login in another tab)
+    const handleStorage = () => loadCart();
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  // ADD TO CART — NO ALERT, NO ERROR, SILENT
   async function addToCart(product, qty = 1) {
-    if (!user) return alert("Please login to add items to cart");
+    const user = getUser();
+    if (!user?.id) return; // ← Silent if not logged in
 
     try {
       const res = await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
@@ -39,16 +56,19 @@ export const CartProvider = ({ children }) => {
         body: JSON.stringify({ userId: user.id, product, qty }),
       });
 
-      const data = await res.json();
-      setCart(data.items || []);
+      if (res.ok) {
+        const data = await res.json();
+        setCart(data.items || []);
+      }
+      // If failed → do nothing (silent)
     } catch (err) {
-      console.log("Add to cart failed:", err);
-      alert("Failed to add item");
+      // Silent fail
     }
   }
 
   async function updateQty(productId, qty) {
-    if (!user || qty < 1) return;
+    const user = getUser();
+    if (!user?.id || qty < 1) return;
 
     try {
       await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
@@ -58,12 +78,13 @@ export const CartProvider = ({ children }) => {
       });
       loadCart();
     } catch (err) {
-      console.log("Update qty error:", err);
+      // Silent
     }
   }
 
   async function removeFromCart(productId) {
-    if (!user) return;
+    const user = getUser();
+    if (!user?.id) return;
 
     try {
       await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
@@ -73,35 +94,31 @@ export const CartProvider = ({ children }) => {
       });
       loadCart();
     } catch (err) {
-      console.log("Remove error:", err);
+      // Silent
     }
   }
 
-  // ADD THIS: Clear cart after order
   async function clearCart() {
-    if (!user) {
+    const user = getUser();
+    if (!user?.id) {
       setCart([]);
       return;
     }
     try {
-      // If your backend has a clear route
       await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart/clear", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id }),
       });
-    } catch (err) {
-      console.log("Clear cart API not available, clearing locally");
-    } finally {
-      setCart([]); // Always clear locally
-    }
+    } catch {}
+    setCart([]);
   }
 
   const totalItems = cart.reduce((sum, item) => sum + (item.qty || 1), 0);
 
   function totalPrice() {
     return cart.reduce((sum, item) => {
-      const price = item.productId?.price || item.price || 0;
+      const price = item.productId?.price || 0;
       const qty = item.qty || 1;
       return sum + price * qty;
     }, 0);
@@ -114,10 +131,10 @@ export const CartProvider = ({ children }) => {
         addToCart,
         removeFromCart,
         updateQty,
-        clearCart,        // ← NOW EXPORTED
+        clearCart,
         totalItems,
-        totalPrice,       // ← function
-        loadCart          // optional: for manual refresh
+        totalPrice,
+        loadCart
       }}
     >
       {children}
