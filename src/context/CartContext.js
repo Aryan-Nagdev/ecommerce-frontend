@@ -6,7 +6,7 @@ const CartContext = createContext();
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
 
-  // Always read fresh user — never cache it
+  // Always get fresh user + token
   const getUser = () => {
     try {
       const u = localStorage.getItem("user");
@@ -14,6 +14,16 @@ export const CartProvider = ({ children }) => {
     } catch {
       return null;
     }
+  };
+
+  const getAuthHeaders = () => {
+    const user = getUser();
+    const token = user?.token || "";
+    return {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "x-auth-token": token
+    };
   };
 
   const loadCart = async () => {
@@ -24,37 +34,43 @@ export const CartProvider = ({ children }) => {
     }
 
     try {
-      const res = await fetch(`https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`);
+      const res = await fetch(
+        `https://ecommerce-backend-k7re.onrender.com/api/cart/${user.id}`,
+        { headers: getAuthHeaders() }
+      );
+
       if (res.ok) {
         const data = await res.json();
         setCart(data.items || []);
       } else {
         setCart([]);
       }
-    } catch {
+    } catch (err) {
       setCart([]);
     }
   };
 
   useEffect(() => {
     loadCart();
-    // Re-load cart when login status changes
-    window.addEventListener("storage", loadCart);
-    const interval = setInterval(loadCart, 5000); // safety net
+
+    const handleStorage = () => loadCart();
+    window.addEventListener("storage", handleStorage);
+    const interval = setInterval(loadCart, 8000);
+
     return () => {
-      window.removeEventListener("storage", loadCart);
+      window.removeEventListener("storage", handleStorage);
       clearInterval(interval);
     };
   }, []);
 
   const addToCart = async (product, qty = 1) => {
     const user = getUser();
-    if (!user?.id) return; // silent if not logged in
+    if (!user?.id) return;
 
     try {
       const res = await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ userId: user.id, product, qty }),
       });
 
@@ -63,7 +79,7 @@ export const CartProvider = ({ children }) => {
         setCart(data.items || []);
       }
     } catch (err) {
-      // silent fail
+      // silent
     }
   };
 
@@ -71,42 +87,54 @@ export const CartProvider = ({ children }) => {
     const user = getUser();
     if (!user?.id || qty < 1) return;
 
-    await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, productId, qty }),
-    });
-    loadCart();
+    try {
+      await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ userId: user.id, productId, qty }),
+      });
+      loadCart();
+    } catch (err) {}
   };
 
   const removeFromCart = async (productId) => {
     const user = getUser();
     if (!user?.id) return;
 
-    await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, productId }),
-    });
-    loadCart();
+    try {
+      await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart", {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ userId: user.id, productId }),
+      });
+      loadCart();
+    } catch (err) {}
   };
 
   const clearCart = async () => {
-    setCart([]);
     const user = getUser();
+    setCart([]); // always clear locally
+
     if (!user?.id) return;
+
     try {
       await fetch("https://ecommerce-backend-k7re.onrender.com/api/cart/clear", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ userId: user.id }),
       });
-    } catch {}
+    } catch (err) {}
   };
 
   const totalPrice = () => {
-    return cart.reduce((sum, item) => sum + (item.productId?.price || 0) * (item.qty || 1), 0);
+    return cart.reduce((sum, item) => {
+      const price = item.productId?.price || item.price || 0;
+      const qty = item.qty || 1;
+      return sum + price * qty;
+    }, 0);
   };
+
+  const totalItems = cart.reduce((sum, item) => sum + (item.qty || 1), 0);
 
   return (
     <CartContext.Provider
@@ -117,6 +145,7 @@ export const CartProvider = ({ children }) => {
         removeFromCart,
         clearCart,
         totalPrice,
+        totalItems,
         loadCart,
       }}
     >
