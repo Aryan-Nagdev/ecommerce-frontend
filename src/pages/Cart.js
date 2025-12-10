@@ -1,16 +1,13 @@
 // src/pages/Cart.js
-import React, { useEffect } from 'react';
+import React from 'react';
 import Navbar from '../components/Navbar';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 
 const Cart = () => {
-  const { cart, updateQty, removeFromCart, fetchCart, totalPrice } = useCart();
+  // FIXED: Removed fake `fetchCart`, totalPrice is a function
+  const { cart, updateQty, removeFromCart, totalPrice } = useCart();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    fetchCart();
-  }, []);
 
   if (!cart) {
     return (
@@ -38,7 +35,7 @@ const Cart = () => {
     );
   }
 
-  const subtotal = totalPrice();   // <--- FIX
+  const subtotal = totalPrice();  // ← Call the function!
   const discount = subtotal * 0.1;
   const total = Math.round(subtotal - discount);
 
@@ -51,12 +48,10 @@ const Cart = () => {
         </h1>
 
         <div className="grid lg:grid-cols-3 gap-12">
-
           <div className="lg:col-span-2 space-y-10">
             {cart.map((item) => {
-              const imageUrl = Array.isArray(item.images)
-                ? item.images[0]
-                : (typeof item.images === 'string' ? item.images : null);
+              const product = item.productId;
+              const imageUrl = product.images?.[0] || "https://via.placeholder.com/200?text=No+Image";
 
               return (
                 <div
@@ -64,51 +59,40 @@ const Cart = () => {
                   className="bg-white rounded-3xl shadow-2xl p-8 flex flex-col sm:flex-row gap-8 hover:shadow-3xl transition-all"
                 >
                   <img
-                    src={imageUrl || "https://via.placeholder.com/200?text=No+Image"}
-                    alt={item.title || "Product"}
+                    src={imageUrl}
+                    alt={product.title}
                     className="w-44 h-44 rounded-2xl object-cover border-4 border-gray-100"
-                    onError={(e) => {
-                      e.target.src = "https://via.placeholder.com/200?text=No+Image";
-                    }}
+                    onError={(e) => e.target.src = "https://via.placeholder.com/200?text=No+Image"}
                   />
 
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
-                      <h3 className="text-2xl font-bold text-gray-800">
-                        {item.title || "Unknown Product"}
-                      </h3>
+                      <h3 className="text-2xl font-bold text-gray-800">{product.title}</h3>
                       <p className="text-4xl font-bold text-orange-600 mt-4">
-                        ₹{(Number(item.price) || 0).toLocaleString('en-IN')}
+                        ₹{Number(product.price).toLocaleString('en-IN')}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-6 mt-6">
                       <button
-                        onClick={() => item.qty > 1 && updateQty(item._id, item.qty - 1)}
+                        onClick={() => item.qty > 1 && updateQty(product._id, item.qty - 1)}
                         className="w-14 h-14 rounded-full bg-gray-200 text-3xl font-bold hover:bg-gray-300 transition"
-                      >
-                        −
-                      </button>
+                      >−</button>
 
-                      <span className="text-3xl font-bold w-20 text-center">
-                        {item.qty || 1}
-                      </span>
+                      <span className="text-3xl font-bold w-20 text-center">{item.qty}</span>
 
                       <button
-                        onClick={() => updateQty(item._id, (item.qty || 1) + 1)}
+                        onClick={() => updateQty(product._id, item.qty + 1)}
                         className="w-14 h-14 rounded-full bg-gray-200 text-3xl font-bold hover:bg-gray-300 transition"
-                      >
-                        +
-                      </button>
+                      >+</button>
 
                       <button
-                        onClick={() => removeFromCart(item._id)}
+                        onClick={() => removeFromCart(product._id)}
                         className="ml-auto text-red-600 font-bold text-lg hover:text-red-800 transition"
                       >
                         Remove
                       </button>
                     </div>
-
                   </div>
                 </div>
               );
@@ -123,17 +107,14 @@ const Cart = () => {
                 <span>Subtotal</span>
                 <span className="font-bold">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
-
               <div className="flex justify-between text-green-600 font-semibold">
                 <span>Special Discount (10%)</span>
                 <span>-₹{discount.toFixed(0)}</span>
               </div>
-
               <div className="flex justify-between text-green-600">
                 <span>Shipping</span>
                 <span className="font-medium">FREE</span>
               </div>
-
               <div className="border-t-4 border-dashed border-orange-300 pt-8 mt-8">
                 <div className="flex justify-between text-3xl font-bold">
                   <span>Total</span>
@@ -148,9 +129,7 @@ const Cart = () => {
             >
               Proceed to Checkout
             </button>
-
           </div>
-
         </div>
       </div>
     </>
