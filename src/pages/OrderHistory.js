@@ -10,7 +10,7 @@ const OrderHistory = () => {
   useEffect(() => {
     if (!user) return;
 
-    fetch(`http://localhost:5000/api/orders/history/${user.id}`)
+    fetch(`https://ecommerce-backend-k7re.onrender.com/api/orders/history/${user.id}`)
       .then(r => r.json())
       .then(data => setOrders(data))
       .catch(() => setOrders([]));

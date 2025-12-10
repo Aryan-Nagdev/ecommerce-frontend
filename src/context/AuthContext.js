@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    const res = await fetch('http://localhost:5000/api/login', {
+    const res = await fetch('https://ecommerce-backend-k7re.onrender.com/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signup = async (name, email, phone, password) => {
-    const res = await fetch('http://localhost:5000/api/register', {
+    const res = await fetch('https://ecommerce-backend-k7re.onrender.com/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, phone, password })
