@@ -5,7 +5,6 @@ import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
 
 const Cart = () => {
-  // FIXED: Removed fake `fetchCart`, totalPrice is a function
   const { cart, updateQty, removeFromCart, totalPrice } = useCart();
   const navigate = useNavigate();
 
@@ -35,7 +34,7 @@ const Cart = () => {
     );
   }
 
-  const subtotal = totalPrice();  // ← Call the function!
+  const subtotal = totalPrice();
   const discount = subtotal * 0.1;
   const total = Math.round(subtotal - discount);
 
@@ -49,13 +48,20 @@ const Cart = () => {
 
         <div className="grid lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-10">
-            {cart.map((item) => {
-              const product = item.productId;
+            {cart.map((item, idx) => {
+              // normalized shape: item.productId exists
+              const product = item.productId || {
+                _id: item._id,
+                title: item.title,
+                price: item.price,
+                images: item.images,
+              };
+
               const imageUrl = product.images?.[0] || "https://via.placeholder.com/200?text=No+Image";
 
               return (
                 <div
-                  key={item._id}
+                  key={product._id || idx}
                   className="bg-white rounded-3xl shadow-2xl p-8 flex flex-col sm:flex-row gap-8 hover:shadow-3xl transition-all"
                 >
                   <img

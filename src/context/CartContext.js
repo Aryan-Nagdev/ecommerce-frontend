@@ -1,3 +1,4 @@
+// src/context/CartContext.js
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 const CartContext = createContext();
@@ -6,23 +7,55 @@ export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const API = "https://ecommerce-backend-k7re.onrender.com/api";
 
-  // ✅ FIX 1: Read correct login key ("shopkaro_user")
+  // Robust: try several possible storage keys and normalize returned user object
   const getUser = () => {
     try {
-      const stored = localStorage.getItem("shopkaro_user");
+      const stored =
+        localStorage.getItem("shopkaro_user") ||
+        localStorage.getItem("userData") ||
+        localStorage.getItem("user") ||
+        localStorage.getItem("userData_v2");
+
       if (!stored) return null;
+      const u = JSON.parse(stored);
 
-      const user = JSON.parse(stored);
-
-      // ✅ FIX 2: Backend returns "_id", but CartContext needs "id"
-      return {
-        ...user,
-        id: user.id || user._id, // ensure id always exists
-      };
-
-    } catch {
+      // ensure we always have `.id` available (backend sometimes returns id or _id)
+      return { ...u, id: u.id || u._id || u.userId || null };
+    } catch (e) {
       return null;
     }
+  };
+
+  // Normalize items to shape: { productId: { _id, title, price, images }, qty }
+  const normalizeItems = (items = []) => {
+    return items.map((item) => {
+      // If backend already returned productId shape, keep it
+      if (item.productId) {
+        // ensure productId._id is string
+        return {
+          productId: { ...item.productId, _id: item.productId._id?.toString() || item.productId._id },
+          qty: item.qty || 1,
+          _raw: item // keep raw if needed
+        };
+      }
+
+      // Backend returned flat object: {_id, title, price, images, qty}
+      if (item._id || item.title) {
+        return {
+          productId: {
+            _id: item._id?.toString() || item._id,
+            title: item.title,
+            price: item.price,
+            images: item.images || []
+          },
+          qty: item.qty || 1,
+          _raw: item
+        };
+      }
+
+      // Fallback: keep as-is
+      return item;
+    });
   };
 
   const loadCart = async () => {
@@ -36,24 +69,44 @@ export const CartProvider = ({ children }) => {
       const res = await fetch(`${API}/cart/${user.id}`);
       if (res.ok) {
         const data = await res.json();
-        setCart(data.items || []);
+        // backend returns { items: [...] } where each item may be flat or have productId
+        const items = data.items || [];
+        setCart(normalizeItems(items));
+        return;
       }
+      setCart([]);
     } catch (err) {
       console.error("Load cart failed:", err);
+      setCart([]);
     }
   };
 
   useEffect(() => {
     loadCart();
 
+    // keep cart in sync (storage and interval)
+    const handleStorage = () => loadCart();
+    window.addEventListener("storage", handleStorage);
+
     const interval = setInterval(loadCart, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ADD ITEM
+  // Add to cart: accepts (product, qty) OR (productIdObject)
   const addToCart = async (product, qty = 1) => {
     const user = getUser();
     if (!user?.id) return;
+
+    // product may be product object or productId wrapper. We need product._id
+    const prodId = product._id || (product.productId && product.productId._id) || product.id;
+    if (!prodId) {
+      console.error("Product id missing when adding to cart", product);
+      return;
+    }
 
     try {
       const res = await fetch(`${API}/cart`, {
@@ -62,73 +115,86 @@ export const CartProvider = ({ children }) => {
         body: JSON.stringify({
           userId: user.id,
           product: {
-            ...product,
-            _id: product._id?.toString(),
+            _id: prodId.toString()
           },
-          qty,
+          qty: Number(qty) || 1
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
-        setCart(data.items || []);
+        setCart(normalizeItems(data.items || []));
       } else {
-        console.error("Add failed:", res.status);
+        const txt = await res.text().catch(() => "");
+        console.error("Add to cart failed:", res.status, txt);
       }
     } catch (err) {
-      console.error("Add error:", err);
+      console.error("Add to cart error:", err);
     }
   };
 
-  // UPDATE QTY
   const updateQty = async (productId, qty) => {
     const user = getUser();
     if (!user?.id) return;
+    if (!productId) return;
 
-    await fetch(`${API}/cart`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        productId,
-        qty,
-      }),
-    });
-
+    try {
+      await fetch(`${API}/cart`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, productId: productId.toString(), qty }),
+      });
+    } catch (err) {
+      console.error("Update qty error:", err);
+    }
+    // refresh local cart
     loadCart();
   };
 
-  // REMOVE ITEM
   const removeFromCart = async (productId) => {
     const user = getUser();
     if (!user?.id) return;
+    if (!productId) return;
 
-    await fetch(`${API}/cart`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: user.id,
-        productId,
-      }),
-    });
-
+    try {
+      await fetch(`${API}/cart`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, productId: productId.toString() }),
+      });
+    } catch (err) {
+      console.error("Remove from cart error:", err);
+    }
     loadCart();
   };
 
-  // CALCULATE TOTAL
+  // total price: support both shapes
   const totalPrice = () => {
     return cart.reduce((sum, item) => {
-      return sum + Number(item.productId?.price || 0) * (item.qty || 1);
+      const price =
+        item.productId?.price ??
+        item._raw?.price ??
+        item.price ??
+        0;
+      const q = item.qty ?? 1;
+      return sum + Number(price || 0) * Number(q || 1);
     }, 0);
   };
 
   return (
     <CartContext.Provider
-      value={{ cart, addToCart, updateQty, removeFromCart, loadCart, totalPrice }}
+      value={{
+        cart,
+        addToCart,
+        updateQty,
+        removeFromCart,
+        loadCart,
+        totalPrice,
+      }}
     >
       {children}
     </CartContext.Provider>
   );
 };
 
-export const useCart = () => useContext(CCartContext);
+export const useCart = () => useContext(CartContext);
