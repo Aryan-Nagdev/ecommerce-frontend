@@ -18,12 +18,12 @@ const Checkout = () => {
     pincode: "",
   });
 
-  // ⭐ FIXED: send "images" array because backend uses i.images[0]
+  // ⭐ FINAL FIX: Send "images" array so backend can store item.image correctly
   const orderItems = cart.map((item) => ({
-    _id: item.productId._id,
+    productId: item.productId._id,
     title: item.productId.title,
     price: item.productId.price,
-    images: item.productId.images, // <-- Correct field ✔
+    images: item.productId.images,  // backend expects this
     qty: item.qty,
   }));
 
@@ -61,7 +61,6 @@ const Checkout = () => {
       const data = await res.json();
       console.log("Order response:", data);
 
-      // Backend returns: { message: "Success", order }
       if (data.message === "Success") {
         await clearCart();
         toast.success("Order placed successfully!");
@@ -130,7 +129,10 @@ const Checkout = () => {
 
           <div className="max-h-96 overflow-y-auto space-y-4">
             {cart.map((item, i) => (
-              <div key={i} className="flex justify-between border-b pb-3 text-lg">
+              <div
+                key={i}
+                className="flex justify-between border-b pb-3 text-lg"
+              >
                 <span>{item.productId.title}</span>
                 <span>
                   ₹{(item.productId.price * item.qty).toLocaleString("en-IN")}
