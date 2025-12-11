@@ -1,5 +1,6 @@
 // src/context/CartContext.js
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { toast } from "react-hot-toast";
 
 const CartContext = createContext();
 
@@ -7,106 +8,60 @@ export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const API = "https://ecommerce-backend-k7re.onrender.com/api";
 
-  // Robust: try several possible storage keys and normalize returned user object
+  // Get logged in user (Auth stores shopkaro_user)
   const getUser = () => {
     try {
       const stored =
         localStorage.getItem("shopkaro_user") ||
         localStorage.getItem("userData") ||
-        localStorage.getItem("user") ||
-        localStorage.getItem("userData_v2");
+        localStorage.getItem("user");
 
       if (!stored) return null;
-      const u = JSON.parse(stored);
 
-      // ensure we always have `.id` available (backend sometimes returns id or _id)
-      return { ...u, id: u.id || u._id || u.userId || null };
-    } catch (e) {
+      const u = JSON.parse(stored);
+      return { ...u, id: u.id || u._id || u.userId };
+    } catch {
       return null;
     }
   };
 
-  // Normalize items to shape: { productId: { _id, title, price, images }, qty }
-  const normalizeItems = (items = []) => {
-    return items.map((item) => {
-      // If backend already returned productId shape, keep it
-      if (item.productId) {
-        // ensure productId._id is string
-        return {
-          productId: { ...item.productId, _id: item.productId._id?.toString() || item.productId._id },
-          qty: item.qty || 1,
-          _raw: item // keep raw if needed
-        };
-      }
+  // Normalize backend response into frontend structure
+  const normalizeItems = (items = []) =>
+    items.map((item) => ({
+      productId: {
+        _id: item.productId?._id?.toString() || item._id?.toString(),
+        title: item.productId?.title || item.title,
+        price: item.productId?.price || item.price,
+        images: item.productId?.images || item.images || [],
+      },
+      qty: item.qty || 1,
+    }));
 
-      // Backend returned flat object: {_id, title, price, images, qty}
-      if (item._id || item.title) {
-        return {
-          productId: {
-            _id: item._id?.toString() || item._id,
-            title: item.title,
-            price: item.price,
-            images: item.images || []
-          },
-          qty: item.qty || 1,
-          _raw: item
-        };
-      }
-
-      // Fallback: keep as-is
-      return item;
-    });
-  };
-
+  // Load cart
   const loadCart = async () => {
     const user = getUser();
-    if (!user?.id) {
-      setCart([]);
-      return;
-    }
+    if (!user?.id) return setCart([]);
 
     try {
       const res = await fetch(`${API}/cart/${user.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        // backend returns { items: [...] } where each item may be flat or have productId
-        const items = data.items || [];
-        setCart(normalizeItems(items));
-        return;
-      }
-      setCart([]);
-    } catch (err) {
-      console.error("Load cart failed:", err);
+      const data = await res.json();
+      setCart(normalizeItems(data.items || []));
+    } catch {
       setCart([]);
     }
   };
 
   useEffect(() => {
     loadCart();
-
-    // keep cart in sync (storage and interval)
-    const handleStorage = () => loadCart();
-    window.addEventListener("storage", handleStorage);
-
-    const interval = setInterval(loadCart, 3000);
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      clearInterval(interval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Add to cart: accepts (product, qty) OR (productIdObject)
+  // Add item to cart
   const addToCart = async (product, qty = 1) => {
     const user = getUser();
     if (!user?.id) return;
 
-    // product may be product object or productId wrapper. We need product._id
-    const prodId = product._id || (product.productId && product.productId._id) || product.id;
-    if (!prodId) {
-      console.error("Product id missing when adding to cart", product);
-      return;
-    }
+    const prodId =
+      product._id || product.productId?._id || product.id;
 
     try {
       const res = await fetch(`${API}/cart`, {
@@ -114,72 +69,65 @@ export const CartProvider = ({ children }) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          product: {
-            _id: prodId.toString()
-          },
-          qty: Number(qty) || 1
+          product: { _id: prodId.toString() },
+          qty,
         }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setCart(normalizeItems(data.items || []));
-      } else {
-        const txt = await res.text().catch(() => "");
-        console.error("Add to cart failed:", res.status, txt);
-      }
+      const data = await res.json();
+
+      setCart(normalizeItems(data.items || []));
+      toast.success("Item added to cart"); // 🎉 NEW
     } catch (err) {
-      console.error("Add to cart error:", err);
+      console.error(err);
     }
   };
 
+  // Update quantity
   const updateQty = async (productId, qty) => {
     const user = getUser();
     if (!user?.id) return;
-    if (!productId) return;
 
-    try {
-      await fetch(`${API}/cart`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, productId: productId.toString(), qty }),
-      });
-    } catch (err) {
-      console.error("Update qty error:", err);
-    }
-    // refresh local cart
+    await fetch(`${API}/cart`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, productId, qty }),
+    });
+
     loadCart();
   };
 
+  // Remove
   const removeFromCart = async (productId) => {
     const user = getUser();
     if (!user?.id) return;
-    if (!productId) return;
 
-    try {
-      await fetch(`${API}/cart`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, productId: productId.toString() }),
-      });
-    } catch (err) {
-      console.error("Remove from cart error:", err);
-    }
+    await fetch(`${API}/cart`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, productId }),
+    });
+
     loadCart();
   };
 
-  // total price: support both shapes
-  const totalPrice = () => {
-    return cart.reduce((sum, item) => {
-      const price =
-        item.productId?.price ??
-        item._raw?.price ??
-        item.price ??
-        0;
-      const q = item.qty ?? 1;
-      return sum + Number(price || 0) * Number(q || 1);
-    }, 0);
+  // ❗️ Add missing clearCart (Checkout needs it)
+  const clearCart = async () => {
+    const user = getUser();
+    if (!user?.id) return;
+
+    await fetch(`${API}/cart/${user.id}`, {
+      method: "DELETE",
+    });
+
+    setCart([]);
   };
+
+  const totalPrice = () =>
+    cart.reduce(
+      (sum, item) => sum + item.productId.price * item.qty,
+      0
+    );
 
   return (
     <CartContext.Provider
@@ -188,8 +136,9 @@ export const CartProvider = ({ children }) => {
         addToCart,
         updateQty,
         removeFromCart,
-        loadCart,
+        clearCart, // ⭐ Important
         totalPrice,
+        loadCart,
       }}
     >
       {children}
