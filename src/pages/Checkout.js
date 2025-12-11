@@ -18,11 +18,12 @@ const Checkout = () => {
     pincode: "",
   });
 
+  // ⭐ FIXED: send "images" array because backend uses i.images[0]
   const orderItems = cart.map((item) => ({
-    productId: item.productId._id,
+    _id: item.productId._id,
     title: item.productId.title,
     price: item.productId.price,
-    image: item.productId.images?.[0] || "",
+    images: item.productId.images, // <-- Correct field ✔
     qty: item.qty,
   }));
 
@@ -60,7 +61,7 @@ const Checkout = () => {
       const data = await res.json();
       console.log("Order response:", data);
 
-      // Backend responds with message: "Success"
+      // Backend returns: { message: "Success", order }
       if (data.message === "Success") {
         await clearCart();
         toast.success("Order placed successfully!");
@@ -69,7 +70,7 @@ const Checkout = () => {
         toast.error(data.message || "Order failed");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Checkout Error:", err);
       toast.error("Something went wrong. Try again.");
     }
   };
@@ -81,6 +82,7 @@ const Checkout = () => {
     <>
       <Navbar />
       <div className="max-w-6xl mx-auto px-4 py-10 grid lg:grid-cols-2 gap-12">
+        {/* Address Section */}
         <div className="bg-white p-8 rounded-xl shadow-lg">
           <h2 className="text-2xl font-bold mb-6">Shipping Address</h2>
 
@@ -122,15 +124,13 @@ const Checkout = () => {
           </div>
         </div>
 
+        {/* Summary Section */}
         <div className="bg-white p-8 rounded-xl shadow-lg">
           <h2 className="text-2xl font-bold mb-6">Order Summary</h2>
 
           <div className="max-h-96 overflow-y-auto space-y-4">
             {cart.map((item, i) => (
-              <div
-                key={i}
-                className="flex justify-between border-b pb-3 text-lg"
-              >
+              <div key={i} className="flex justify-between border-b pb-3 text-lg">
                 <span>{item.productId.title}</span>
                 <span>
                   ₹{(item.productId.price * item.qty).toLocaleString("en-IN")}
